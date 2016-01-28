@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<style>
+		#render{
+			position: relative;
+			z-index: 1;
+		}
+	</style>
+</head>
+<body>
+	<div id="content">
+
+	</div>
+	<button id="render">render</button>
+<script src="procBG.js"></script>
+<script type="text/javascript">
+	var test = ProceduralBackground({});
+	test.generate();
+	document.getElementById("render").addEventListener("click", function( ) {
+		test.render();
+	}, false);
+</script>
+</body>
+</html>
