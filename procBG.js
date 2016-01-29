@@ -6,11 +6,12 @@ function ProceduralBackground(user_settings){
   },
 
   _settings = {
-    cell_width      : 1,
-    cell_height     : 1,
+    cell_width      : 40,
+    cell_height     : 40,
     cell_gap        : 0,
-    variance        : 5,
-    fill_percentage : 100,
+    variance        : 20,
+    fill_percentage : 70,
+    seed            : {x: 15, y: 10, r: 239, g: 99, b: 0},
     parent          : document.body,
     canvas          : document.createElement("canvas"),
 
@@ -60,23 +61,22 @@ function ProceduralBackground(user_settings){
 
   /* Generate initial representation of our grid */
   function generateGrid(height, width){
-    var grid = [],
-        x_pointer = 0,
-        y_pointer = 0;
+    var size = height * width,
+        grid_object = {
+          height: height,
+          width : width,
+          state : [],
+          r     : new Uint8ClampedArray(size),
+          g     : new Uint8ClampedArray(size),
+          b     : new Uint8ClampedArray(size),
+          a     : new Int8Array(size)
+        };
 
-    grid.length = height * width;
-
-    for (var i = 0; i < grid.length; i++) {
-      if (i > 0 && i % width === 0){
-        y_pointer++;
-        x_pointer = 0;
-      }
-      //console.log(i+ ": " + x_pointer + " " + y_pointer);
-       grid[i] = {x: x_pointer, y: y_pointer, colour: null};
-       x_pointer++;
+    for (var i = 0; i < size; i++) {
+      grid_object.state[i] = 0;
     };
 
-    return grid;
+    return grid_object;
   }
 
   /* Get coordinates and rgb of random seed to use as starting point */
@@ -85,113 +85,123 @@ function ProceduralBackground(user_settings){
         y = Math.floor(Math.random() * grid_height),
         r = Math.floor(Math.random() * 256),
         g = Math.floor(Math.random() * 256),
-        b = Math.floor(Math.random() * 256),
-        rgb_string = 'rgb('+ r +','+ g +','+ b +')';
+        b = Math.floor(Math.random() * 256);
 
-    console.log("Seeded at x: "+ x + " y: " + y, " with colour " + rgb_string);
-    return {x: x, y: y, rgb: rgb_string};
+    console.log("Seeded : ");
+    console.log({x: x,
+            y: y,
+            r: r,
+            g: g,
+            b: b});
+    return {x: x,
+            y: y,
+            r: r,
+            g: g,
+            b: b};
   }
 
 
   /* Insert cell into specified grid */
-  function createCell(grid, grid_height, grid_width, x, y, rgb){
-    grid[y * grid_width + x] = {x: x, y: y, colour: rgb};
+  function createCell(grid_object, x, y, r, g, b){
+    var index = getCellIndex(x, y, grid_object.width, grid_object.height);
 
-    return grid;
+    grid_object.state[index] = 1;
+    grid_object.r[index] = r;
+    grid_object.g[index] = g;
+    grid_object.b[index] = b;
+    grid_object.a[index] = 100;
+
+    return grid_object;
   }
 
 
-  /* Get cell at specified coords */
-  function getCell(grid, grid_height, x, y){
-    var cell = {x: Infinity, y: Infinity, colour: null}, // default cell is "out of bounds"
-        grid_width = grid.length / grid_height;
-
-    if ((x > 0 && x < grid_width) &&
-        (y > 0 && y < grid_height) &&
-         grid[y * grid_width + x]){
-      cell = grid[y * grid_width + x];
+  function getCellXY(grid_object, index){
+    var modulo = index % grid_object.width;
+    return {
+      x : index < grid_object.width ? index : modulo,
+      y : index < grid_object.width ? 0 : (index - modulo) / grid_object.width,
     }
-
-    return cell;
   }
 
 
-  function getCellIndex(x, y, grid_width){
-    return y * grid_width + x;
+  function getCellIndex(x, y, grid_width, grid_height){
+    if ((x < 0 || x >= grid_width) || (y < 0 || y >= grid_height))
+      return Infinity;
+    else
+      return y * grid_width + x;
   }
 
 
   /* Create list of  cells adjacent to coords (horizontally and diagonally)*/
-  function getListOfAdjacentCells(grid, grid_height, x, y){
+  function getListOfAdjacentCellIndices(grid_object, x, y){
 
     var initial_list = [
-      getCell(grid, grid_height, x + 1, y),
-      getCell(grid, grid_height, x + 1, y + 1),
-      getCell(grid, grid_height, x, y + 1),
-      getCell(grid, grid_height, x - 1, y),
-      getCell(grid, grid_height, x - 1, y - 1),
-      getCell(grid, grid_height, x, y - 1),
-      getCell(grid, grid_height, x - 1, y + 1),
-      getCell(grid, grid_height, x + 1, y - 1),    
+      getCellIndex(x + 1, y,     grid_object.width, grid_object.height),
+      getCellIndex(x + 1, y + 1, grid_object.width, grid_object.height),
+      getCellIndex(x,     y + 1, grid_object.width, grid_object.height),
+      getCellIndex(x - 1, y,     grid_object.width, grid_object.height),
+      getCellIndex(x - 1, y - 1, grid_object.width, grid_object.height),
+      getCellIndex(x,     y - 1, grid_object.width, grid_object.heighth),
+      getCellIndex(x - 1, y + 1, grid_object.width, grid_object.height),
+      getCellIndex(x + 1, y - 1, grid_object.width, grid_object.height),    
     ],
     filtered_list = [],
-    grid_width = grid.length / grid_height;
+    grid_size = grid_object.width * grid_object.height,
+    index = 0;
 
     for (var i = 0; i < initial_list.length; i++) {
-      var cell_x = initial_list[i].x,
-          cell_y = initial_list[i].y;
+      index = initial_list[i];
 
-      if (cell_x !== Infinity && cell_y !== Infinity && initial_list[i].colour === null)
+      if (index !== Infinity && grid_object.state[index] === 0)
         filtered_list[filtered_list.length++] = initial_list[i];
     };
 
     return filtered_list;
   }
 
-
   /* Algorithm to find list of all cells that are at the bounds of the currently generated shape */
-  function getListOfBoundingCells(grid, grid_height, old_bounding_cell_indices){
-    var new_indices = [],
-        grid_width = grid.length / grid_height;
+  function getListOfBoundingCells(grid_object, old_bounding_cell_indices){
+    var new_indices = [];
+    new_indices.length = old_bounding_cell_indices.length * 10;
 
-    var y_pointer = 0,
-        x_pointer = 0,
-        prev_index_x,
-        next_index_x,
-        prev_index_y,
-        next_index_y,
-        cell;
+    var width = grid_object.width,
+        state = grid_object.state,
+        curr_index,
+        cell_x,
+        cell_y,
+        modulo,
+        test = 0,
+        i = 0;
 
-    for (var i = 0; i < old_bounding_cell_indices.length; i++) {
-      cell = grid[old_bounding_cell_indices[i]];
-      prev_index_x = cell.y * grid_width + cell.x - 1;
-      next_index_x = cell.y * grid_width + cell.x + 1;
-      prev_index_y = (cell.y - 1) * grid_width + cell.x;
-      next_index_y = (cell.y + 1) * grid_width + cell.x;
+    for (i; i < old_bounding_cell_indices.length; i++) {
+      curr_index = old_bounding_cell_indices[i];
 
-      var in_list = false;
+      modulo = curr_index % width;
+      cell_x = curr_index < width ? curr_index : modulo;
+      cell_y = curr_index < width ? 0 : (curr_index - modulo) / width;
 
-      if (grid[prev_index_x] && grid[prev_index_x].colour === null){
-        new_indices[new_indices.length++] = old_bounding_cell_indices[i];
-        in_list = true;
+
+      if (state[cell_y * width + cell_x - 1] === 0){ // previous x index
+        new_indices[test++] = curr_index;
+        continue;
       }
 
-      if (!in_list && grid[next_index_x] && grid[next_index_x].colour === null){
-        new_indices[new_indices.length++] = old_bounding_cell_indices[i];
-        in_list = true;
+      if (state[cell_y * width + cell_x + 1] === 0){ // next x index
+        new_indices[test++] = curr_index;
+        continue;
       }
 
-      if (!in_list && grid[prev_index_y] && grid[prev_index_y].colour === null){
-        new_indices[new_indices.length++] = old_bounding_cell_indices[i];
-        in_list = true;
+      if (state[(cell_y - 1) * width + cell_x] === 0){ // previous y index
+        new_indices[test++] = curr_index;
+        continue;
       }
 
-      if (!in_list && grid[next_index_y] && grid[next_index_y].colour === null){
-        new_indices[new_indices.length++] = old_bounding_cell_indices[i];     
+      if (state[(cell_y + 1) * width + cell_x] === 0){ // next y index
+        new_indices[test++] = curr_index;
       }
     };
-    
-    return new_indices;
+
+    return new_indices.slice(0, test);
   }
 
   /* render the background grid */
@@ -217,36 +227,40 @@ function ProceduralBackground(user_settings){
   }
 
   /* Render the main grid data */
-  function render(grid, grid_height, ctx, settings){
+  function render(grid_object, grid_height, ctx, settings){
     var cell_width = settings.cell_width,
         cell_height = settings.cell_height,
         gap = settings.cell_gap,
         default_colour = settings.default_colour || "rgba(0,0,0,0)",
         circle = false,
-        grid_width = grid.length / grid_height,
+        grid_size = grid_object.height * grid_object.width,
+        grid_width = grid_object.width,
         x_pointer = 0,
         y_pointer = 0;
 
     //ctx.clearRect(0,0, grid.length * cell_height, grid.length * cell_height + cell_height);
 
-    for (var i = 0; i < grid.length; i++){
+    for (var i = 0; i < grid_size; i++){
         if (i > 0 && i % grid_width === 0){
           y_pointer++;
           x_pointer = 0;
         }
-        var cell = getCell(grid, grid_height, x_pointer, y_pointer);
-
         // if (cell.colour){
         //   console.log(x_pointer + " " + y_pointer);
         //   console.log(cell);
         // }
  
-        ctx.fillStyle = cell.colour || default_colour;
-        //console.log(x_pointer * cell_width + " " + y_pointer * cell_height);
+        ctx.fillStyle = grid_object.state[i] === 1 ? "rgba("+ grid_object.r[i] +","+ grid_object.g[i] +","+ grid_object.b[i] +","+ grid_object.a[i] +")" : default_colour;
 
-        ctx.fillRect(cell.x * (cell_width + gap), cell.y * (cell_height + gap)/*(grid_height * (cell_height + gap)) - ((cell.y + gap) * cell_height)*/, cell_width, cell_height);
-
-
+        if (Math.random() <= 0.5){
+          ctx.fillRect(x_pointer * (cell_width + gap), y_pointer * (cell_height + gap)/*(grid_height * (cell_height + gap)) - ((cell.y + gap) * cell_height)*/, cell_width, cell_height);
+        }else{
+          ctx.beginPath();
+          ctx.moveTo(x_pointer * (cell_width + gap), y_pointer * (cell_height + gap));
+          ctx.lineTo(x_pointer * (cell_width + gap), y_pointer * (cell_height + gap) - cell_height);
+          ctx.lineTo(x_pointer * (cell_width + gap) + cell_width, y_pointer * (cell_height + gap))
+          ctx.fill();
+        }
         //console.log(getCell(grid, grid_height, x_pointer, y_pointer));
         // if (circle){
           // ctx.strokeStyle = ctx.fillStyle;
@@ -262,11 +276,11 @@ function ProceduralBackground(user_settings){
         //   ctx.lineWidth = 2;
         //   ctx.strokeRect(cell.x * cell_width + (ctx.lineWidth / 2), (grid_height * cell_height - cell.y * cell_height) + (ctx.lineWidth / 2), cell_width, cell_height);
         // }
-        if (cell.adjacent){
-         ctx.strokeStyle = "red";
-         ctx.lineWidth = 2;
-         ctx.strokeRect(cell.x * cell_width + (ctx.lineWidth / 2), (grid_height * cell_height - cell.y * cell_height) + (ctx.lineWidth / 2), cell_width, cell_height);
-        }
+        // if (cell.adjacent){
+        //  ctx.strokeStyle = "red";
+        //  ctx.lineWidth = 2;
+        //  ctx.strokeRect(cell.x * cell_width + (ctx.lineWidth / 2), (grid_height * cell_height - cell.y * cell_height) + (ctx.lineWidth / 2), cell_width, cell_height);
+        // }
         x_pointer++;
     }
 
@@ -276,7 +290,7 @@ function ProceduralBackground(user_settings){
   }
 
   /* get average colour with slight variance shift for all listed colours */
-  function getAvgColour(base_cell, cell_list, settings){
+  function getAvgColour(base_cell_index, adjacent_cell_indices, grid_object, settings){
     var colour = "",
       reds = 0,
       greens = 0, 
@@ -284,14 +298,13 @@ function ProceduralBackground(user_settings){
       total = 0,
       variance = settings.variance;
 
-    cell_list.push(base_cell);
+    adjacent_cell_indices.push(base_cell_index);
 
-    for (var i = 0; i < cell_list.length; i++) {
-      if (cell_list[i].colour){
-        var colour_rgb = cell_list[i].colour.substring(4, cell_list[i].colour.length - 1).split(",");
-        reds += parseInt(colour_rgb[0]);
-        greens += parseInt(colour_rgb[1]);
-        blues += parseInt(colour_rgb[2]);
+    for (var i = 0; i < adjacent_cell_indices.length; i++) {
+      if (grid_object.state[adjacent_cell_indices[i]] === 1){
+        reds   += grid_object.r[adjacent_cell_indices[i]];
+        greens += grid_object.g[adjacent_cell_indices[i]];
+        blues  += grid_object.b[adjacent_cell_indices[i]];
         total++;
       }
     };
@@ -318,9 +331,7 @@ function ProceduralBackground(user_settings){
       b = b_avg + b_rand > 256 ? 256 : b_avg + b_rand;
     }
 
-    colour = 'rgb('+ r +','+ g +','+ b +')';
-
-    return colour;
+    return {r: r, g: g, b: b};
   }
 
   function generateMainBackground(settings){
@@ -331,31 +342,34 @@ function ProceduralBackground(user_settings){
           bounding_cell_indices   : [],
           empty_cell_not_found    : true,
           empty_cell_search_cycle : 0,
-          new_colour              : "",
-          random_adjacent         : "",
-          base_cell               : "",
-          adjacent_cells          : "",
+          new_colour              : {},
+          random_adjacent_index   : Infinity,
+          random_adjacent_xy      : {},
+          base_cell_index         : Infinity,
+          base_cell_xy            : {},
+          adjacent_cell_indices   : [],
           copy                    : {}
         },
 
-        MAIN_GRID = generateGrid(settings.grid_height, settings.grid_width),
+        MAIN_GRID_OBJECT = generateGrid(settings.grid_height, settings.grid_width),
         context =  settings.canvas.getContext('2d');
 
 
-    var seed = getSeed(settings.grid_height, settings.grid_width);
-    MAIN_GRID = createCell(MAIN_GRID, settings.grid_height, settings.grid_width, seed.x, seed.y, seed.rgb);
-    _STORE.bounding_cell_indices[0] = getCellIndex(seed.x, seed.y, settings.grid_width);
+    var seed = settings.seed || getSeed(settings.grid_height, settings.grid_width);
+    MAIN_GRID_OBJECT = createCell(MAIN_GRID_OBJECT, seed.x, seed.y, seed.r, seed.g, seed.b);
+    _STORE.bounding_cell_indices[0] = getCellIndex(seed.x, seed.y, settings.grid_width, settings.grid_height);
 
     console.log(settings);
     console.log(generation_cycle_MAX);
     while (generation_cycle < generation_cycle_MAX){
-      _STORE.bounding_cell_indices = getListOfBoundingCells(MAIN_GRID, settings.grid_height, _STORE.bounding_cell_indices);
+      _STORE.bounding_cell_indices = getListOfBoundingCells(MAIN_GRID_OBJECT, _STORE.bounding_cell_indices);
       _STORE.empty_cell_not_found = true;
       _STORE.empty_cell_search_cycle = 0;
-      _STORE.new_colour = "";
-      _STORE.random_adjacent;
+      _STORE.new_colour = {r: 0, g: 0, b: 0, a: 100};
+      _STORE.random_adjacent_index;
       _STORE.base_cell;
-      _STORE.adjacent_cells;
+      _STORE.base_cell_xy;
+      _STORE.adjacent_cell_indices;
 
       if (_STORE.bounding_cell_indices.length === 0){
         _STORE.empty_cell_not_found = false;
@@ -364,14 +378,16 @@ function ProceduralBackground(user_settings){
       }
 
       while (_STORE.empty_cell_not_found && _STORE.empty_cell_search_cycle < 100) {
-        _STORE.base_cell = MAIN_GRID[_STORE.bounding_cell_indices[Math.floor(Math.random() * _STORE.bounding_cell_indices.length)]],
-        _STORE.adjacent_cells = getListOfAdjacentCells(MAIN_GRID, settings.grid_height, _STORE.base_cell.x, _STORE.base_cell.y);
+        _STORE.base_cell_index = _STORE.bounding_cell_indices[Math.floor(Math.random() * _STORE.bounding_cell_indices.length)],
+        _STORE.base_cell_xy = getCellXY(MAIN_GRID_OBJECT, _STORE.base_cell_index);
+        _STORE.adjacent_cell_indices = getListOfAdjacentCellIndices(MAIN_GRID_OBJECT, _STORE.base_cell_xy.x, _STORE.base_cell_xy.y);
 
-        if (_STORE.adjacent_cells.length > 0){
-          _STORE.random_adjacent = _STORE.adjacent_cells[Math.floor(Math.random() * _STORE.adjacent_cells.length)];
-          _STORE.new_colour = getAvgColour(_STORE.base_cell, _STORE.adjacent_cells, settings);
+        if (_STORE.adjacent_cell_indices.length > 0){
+          _STORE.random_adjacent_index = _STORE.adjacent_cell_indices[Math.floor(Math.random() * _STORE.adjacent_cell_indices.length)];
+          _STORE.random_adjacent_xy = getCellXY(MAIN_GRID_OBJECT, _STORE.random_adjacent_index);
+          _STORE.new_colour = getAvgColour(_STORE.base_cell_index, _STORE.adjacent_cell_indices, MAIN_GRID_OBJECT, settings);
 
-          if(_STORE.random_adjacent.colour === null)
+          if(MAIN_GRID_OBJECT.state[_STORE.random_adjacent_index] === 0)
             _STORE.empty_cell_not_found = false;
         }
 
@@ -381,31 +397,31 @@ function ProceduralBackground(user_settings){
         }
       };
 
-      MAIN_GRID = createCell(MAIN_GRID, settings.grid_height, settings.grid_width, _STORE.random_adjacent.x, _STORE.random_adjacent.y, _STORE.new_colour);
-      _STORE.bounding_cell_indices[_STORE.bounding_cell_indices.length++] = getCellIndex(_STORE.random_adjacent.x, _STORE.random_adjacent.y, settings.grid_width);
+      MAIN_GRID_OBJECT = createCell(MAIN_GRID_OBJECT, _STORE.random_adjacent_xy.x, _STORE.random_adjacent_xy.y, _STORE.new_colour.r, _STORE.new_colour.g, _STORE.new_colour.b);
+      _STORE.bounding_cell_indices[_STORE.bounding_cell_indices.length++] = getCellIndex(_STORE.random_adjacent_xy.x, _STORE.random_adjacent_xy.y, settings.grid_width, settings.grid_height);
 
       // for (var i = 0; i < _STORE.bounding_cell_indices.length; i++) {
       //   _STORE.bounding_cell_indices[i].bounding = true;
       // };
 
-      // for (var i = 0; i < _STORE.adjacent_cells.length; i++) {
-      //   _STORE.adjacent_cells[i].adjacent = true;
+      // for (var i = 0; i < _STORE.adjacent_cell_indices.length; i++) {
+      //   _STORE.adjacent_cell_indices[i].adjacent = true;
       // }; 
 
-      // _STORE.copy = JSON.parse(JSON.stringify(MAIN_GRID));
+      // _STORE.copy = JSON.parse(JSON.stringify(MAIN_GRID_OBJECT));
       // render_queue.push(_STORE.copy);
 
       // // for (var i = 0; i < _STORE.bounding_cell_indices.length; i++) {
       // //   _STORE.bounding_cell_indices[i].bounding = false;
       // // };
-      // for (var i = 0; i < _STORE.adjacent_cells.length; i++) {
-      //   _STORE.adjacent_cells[i].adjacent = false;
+      // for (var i = 0; i < _STORE.adjacent_cell_indices.length; i++) {
+      //   _STORE.adjacent_cell_indices[i].adjacent = false;
       // };
 
       generation_cycle++;
     }
 
-    render(MAIN_GRID, settings.grid_height, context, settings);
+    render(MAIN_GRID_OBJECT, settings.grid_height, context, settings);
 
     // var frame = 0;
 
