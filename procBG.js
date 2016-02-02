@@ -14,6 +14,7 @@ function ProceduralBackground(user_settings){
     seed            : {x: 15, y: 10, r: 255, g: 255, b: 255},
     parent          : document.body,
     canvas          : document.createElement("canvas"),
+    context         : {},
 
     canvas_styling : {
       "position" : "fixed",
@@ -52,9 +53,7 @@ function ProceduralBackground(user_settings){
     settings.grid_width = Math.floor(canvas.width / (settings.cell_width + settings.cell_gap)),
     settings.grid_height = Math.floor(canvas.height / (settings.cell_height + settings.cell_gap));
 
-
-    generateMainBackground(settings);
-
+    settings.context = canvas.getContext('2d');
     //Todo: attach resize events/ any other events
   };
 
@@ -240,10 +239,11 @@ function ProceduralBackground(user_settings){
   }
 
   /* Render the main grid data */
-  function render(grid_object, ctx, settings){
+  function render(grid_object, settings){
     var cell_width = settings.cell_width,
         cell_height = settings.cell_height,
         gap = settings.cell_gap,
+        ctx = settings.context,
         default_colour = settings.default_colour || "rgba(0,0,0,0)",
         circle = false,
         grid_size = grid_object.height * grid_object.width,
@@ -347,7 +347,7 @@ function ProceduralBackground(user_settings){
     return {r: r, g: g, b: b};
   }
 
-  function generateMainBackground(settings){
+  function generateMainBackgroundGrid(settings){
     var generation_cycle = 0,
         generation_cycle_MAX = Math.floor(settings.grid_height * settings.grid_width / 100) * settings.fill_percentage,
 
@@ -366,7 +366,7 @@ function ProceduralBackground(user_settings){
         render_queue = [],
 
         MAIN_GRID_OBJECT = generateGrid(settings.grid_height, settings.grid_width),
-        context =  settings.canvas.getContext('2d');
+        context =  settings.contex;
 
 
     var seed = settings.seed || getSeed(settings.grid_height, settings.grid_width);
@@ -431,7 +431,8 @@ function ProceduralBackground(user_settings){
       generation_cycle++;
     }
 
-    render(MAIN_GRID_OBJECT, context, settings);
+
+    return MAIN_GRID_OBJECT;
 
     // var frame = 0;
 
@@ -456,7 +457,8 @@ function ProceduralBackground(user_settings){
     },
 
     render: function(){
-      generateMainBackground(_settings);
+      var gridObj = generateMainBackgroundGrid(_settings);
+      render(gridObj, _settings);
     },
 
     renderFrames: function(){
