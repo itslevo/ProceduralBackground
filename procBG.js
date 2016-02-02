@@ -133,7 +133,7 @@ function ProceduralBackground(user_settings){
 
 
   /* Create list of  cells adjacent to coords (horizontally and diagonally)*/
-  function getListOfAdjacentEmptyIndices(grid_object, x, y){
+  function getListOfAdjacentIndices(grid_object, x, y, return_non_empty){
 
     var initial_list = [
       getCellIndex(x + 1, y,     grid_object.width, grid_object.height),
@@ -146,62 +146,75 @@ function ProceduralBackground(user_settings){
       getCellIndex(x + 1, y - 1, grid_object.width, grid_object.height),    
     ],
     filtered_list = [],
-    grid_size = grid_object.width * grid_object.height,
-    index = 0;
+    index = 0,
+    comparison = ~~return_non_empty,
+    i = 0;
 
-    for (var i = 0; i < initial_list.length; i++) {
+    for (i; i < initial_list.length; i++) {
       index = initial_list[i];
 
-      if (index !== Infinity && grid_object.state[index] === 0)
+      if (index !== Infinity && grid_object.state[index] === comparison)
         filtered_list[filtered_list.length++] = initial_list[i];
     };
 
     return filtered_list;
   }
 
-  /* Algorithm to find list of all cells that are at the bounds of the currently generated shape */
-  function getListOfBoundingCells(grid_object, old_bounding_cell_indices){
-    var new_indices = [];
-    new_indices.length = old_bounding_cell_indices.length * 10;
 
+  /* Algorithm to find list of all cells that are at the bounds of the currently generated shape */
+  function getListOfBoundingCells(grid_object, old_bounding_cell_indices, last_added_xy, last_added_index){
     var width = grid_object.width,
         state = grid_object.state,
         curr_index,
         cell_x,
         cell_y,
         modulo,
-        insert_at = 0,
-        i = 0;
+        no_longer_bounding_index,
+        i;
 
-    for (i; i < old_bounding_cell_indices.length; i++) {
-      curr_index = old_bounding_cell_indices[i];
+    var all_adjacent_indices = [
+      getCellIndex(last_added_xy.x + 1, last_added_xy.y,     grid_object.width, grid_object.height),
+      getCellIndex(last_added_xy.x,     last_added_xy.y + 1, grid_object.width, grid_object.height),
+      getCellIndex(last_added_xy.x - 1, last_added_xy.y,     grid_object.width, grid_object.height),
+      getCellIndex(last_added_xy.x,     last_added_xy.y - 1, grid_object.width, grid_object.heighth)   
+    ];
+
+    all_adjacent_indices[++all_adjacent_indices.length] = last_added_index;
+
+    for (i = 0; i < all_adjacent_indices.length; i++) {
+      curr_index = all_adjacent_indices[i];
+
+      if (state[curr_index] !== 1){
+        continue;
+      }
 
       modulo = curr_index % width;
       cell_x = curr_index < width ? curr_index : modulo;
       cell_y = curr_index < width ? 0 : (curr_index - modulo) / width;
 
-
       if (state[cell_y * width + cell_x - 1] === 0){ // previous x index
-        new_indices[insert_at++] = curr_index;
         continue;
       }
 
       if (state[cell_y * width + cell_x + 1] === 0){ // next x index
-        new_indices[insert_at++] = curr_index;
         continue;
       }
 
       if (state[(cell_y - 1) * width + cell_x] === 0){ // previous y index
-        new_indices[insert_at++] = curr_index;
         continue;
       }
 
       if (state[(cell_y + 1) * width + cell_x] === 0){ // next y index
-        new_indices[insert_at++] = curr_index;
+        continue;
+      }
+
+      no_longer_bounding_index = old_bounding_cell_indices.indexOf(curr_index);
+      if (no_longer_bounding_index >= 0){
+        old_bounding_cell_indices.splice(no_longer_bounding_index, 1);
       }
     };
 
-    return new_indices.slice(0, insert_at);
+    return old_bounding_cell_indices;
   }
 
   /* render the background grid */
@@ -238,7 +251,7 @@ function ProceduralBackground(user_settings){
         x_pointer = 0,
         y_pointer = 0;
 
-    //ctx.clearRect(0,0, grid.length * cell_height, grid.length * cell_height + cell_height);
+    ctx.clearRect(0,0, 10000, 10000);
 
     for (var i = 0; i < grid_size; i++){
         if (i > 0 && i % grid_width === 0){
@@ -271,10 +284,10 @@ function ProceduralBackground(user_settings){
           // ctx.fill();
         // }
 
-        // if (cell.bounding){
+        // if (grid_object.bounding_cell_indices && grid_object.bounding_cell_indices.indexOf(i) !== -1){
         //   ctx.strokeStyle = "blue";
         //   ctx.lineWidth = 2;
-        //   ctx.strokeRect(cell.x * cell_width + (ctx.lineWidth / 2), (grid_height * cell_height - cell.y * cell_height) + (ctx.lineWidth / 2), cell_width, cell_height);
+        //   ctx.strokeRect(x_pointer * cell_width + (ctx.lineWidth / 2), y_pointer * (cell_height + gap) + (ctx.lineWidth / 2), cell_width, cell_height);
         // }
         // if (cell.adjacent){
         //  ctx.strokeStyle = "red";
@@ -350,6 +363,7 @@ function ProceduralBackground(user_settings){
           adjacent_cell_indices   : [],
           copy                    : {}
         },
+        render_queue = [],
 
         MAIN_GRID_OBJECT = generateGrid(settings.grid_height, settings.grid_width),
         context =  settings.canvas.getContext('2d');
@@ -358,11 +372,13 @@ function ProceduralBackground(user_settings){
     var seed = settings.seed || getSeed(settings.grid_height, settings.grid_width);
     MAIN_GRID_OBJECT = createCell(MAIN_GRID_OBJECT, seed.x, seed.y, seed.r, seed.g, seed.b);
     _STORE.bounding_cell_indices[0] = getCellIndex(seed.x, seed.y, settings.grid_width, settings.grid_height);
+    _STORE.random_adjacent_index = getCellIndex(seed.x, seed.y, settings.grid_width, settings.grid_height); // BAD
+    _STORE.random_adjacent_xy = {x: seed.x, y: seed.y};
 
     console.log(settings);
     console.log(generation_cycle_MAX);
     while (generation_cycle < generation_cycle_MAX){
-      _STORE.bounding_cell_indices = getListOfBoundingCells(MAIN_GRID_OBJECT, _STORE.bounding_cell_indices);
+      _STORE.bounding_cell_indices = getListOfBoundingCells(MAIN_GRID_OBJECT, _STORE.bounding_cell_indices, _STORE.random_adjacent_xy, _STORE.random_adjacent_index);
       _STORE.empty_cell_not_found = true;
       _STORE.empty_cell_search_cycle = 0;
       _STORE.new_colour = {r: 0, g: 0, b: 0, a: 100};
@@ -380,7 +396,7 @@ function ProceduralBackground(user_settings){
       while (_STORE.empty_cell_not_found && _STORE.empty_cell_search_cycle < 100) {
         _STORE.base_cell_index = _STORE.bounding_cell_indices[Math.floor(Math.random() * _STORE.bounding_cell_indices.length)],
         _STORE.base_cell_xy = getCellXY(MAIN_GRID_OBJECT, _STORE.base_cell_index);
-        _STORE.adjacent_cell_indices = getListOfAdjacentEmptyIndices(MAIN_GRID_OBJECT, _STORE.base_cell_xy.x, _STORE.base_cell_xy.y);
+        _STORE.adjacent_cell_indices = getListOfAdjacentIndices(MAIN_GRID_OBJECT, _STORE.base_cell_xy.x, _STORE.base_cell_xy.y, false);
 
         if (_STORE.adjacent_cell_indices.length > 0){
           _STORE.random_adjacent_index = _STORE.adjacent_cell_indices[Math.floor(Math.random() * _STORE.adjacent_cell_indices.length)];
@@ -400,13 +416,7 @@ function ProceduralBackground(user_settings){
       MAIN_GRID_OBJECT = createCell(MAIN_GRID_OBJECT, _STORE.random_adjacent_xy.x, _STORE.random_adjacent_xy.y, _STORE.new_colour.r, _STORE.new_colour.g, _STORE.new_colour.b);
       _STORE.bounding_cell_indices[_STORE.bounding_cell_indices.length++] = getCellIndex(_STORE.random_adjacent_xy.x, _STORE.random_adjacent_xy.y, settings.grid_width, settings.grid_height);
 
-      // for (var i = 0; i < _STORE.bounding_cell_indices.length; i++) {
-      //   _STORE.bounding_cell_indices[i].bounding = true;
-      // };
-
-      // for (var i = 0; i < _STORE.adjacent_cell_indices.length; i++) {
-      //   _STORE.adjacent_cell_indices[i].adjacent = true;
-      // }; 
+     // MAIN_GRID_OBJECT.bounding_cell_indices = _STORE.bounding_cell_indices;
 
       // _STORE.copy = JSON.parse(JSON.stringify(MAIN_GRID_OBJECT));
       // render_queue.push(_STORE.copy);
@@ -431,9 +441,9 @@ function ProceduralBackground(user_settings){
     //       return;
 
     //        //console.log("rendering frame " + frame);
-    //   render(render_queue[frame], settings.grid_height, context, settings);
+    //   render(render_queue[frame], context, settings);
     //   frame = frame + 1;
-    //     setTimeout(renderFrame, 10);
+    //     setTimeout(renderFrame, 16);
     // };
 
     // renderFrame();
