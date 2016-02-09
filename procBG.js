@@ -190,11 +190,11 @@ function ProceduralBackground(user_settings){
         cell_x = curr_index < width ? curr_index : modulo;
         cell_y = curr_index < width ? 0 : (curr_index - modulo) / width;
 
-        if (state[cell_y * width + cell_x - 1] === 0){ // previous x index
+        if (cell_x - 1 >= 0 && state[cell_y * width + cell_x - 1] === 0){ // previous x index
           continue;
         }
 
-        if (state[cell_y * width + cell_x + 1] === 0){ // next x index
+        if (cell_x + 1 < width && state[cell_y * width + cell_x + 1] === 0){ // next x index
           continue;
         }
 
