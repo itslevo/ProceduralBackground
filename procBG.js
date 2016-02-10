@@ -208,12 +208,26 @@ function ProceduralBackground(user_settings){
 
         no_longer_bounding_index = old_bounding_cell_indices.indexOf(curr_index);
         if (no_longer_bounding_index >= 0){
-          old_bounding_cell_indices.splice(no_longer_bounding_index, 1);
+          this.spliceOne(old_bounding_cell_indices, no_longer_bounding_index)
         }
       };
 
       return old_bounding_cell_indices;
     },
+
+
+    spliceOne: function(arr, index) {
+      var len = arr.length;
+      if (!len) { 
+        return
+      }
+
+      for (index; index < len; index++) { 
+        arr[index] = arr[index+1];
+      }
+
+      arr.length--;
+     },
 
 
     /* get average colour with slight variance shift for all listed colours */
