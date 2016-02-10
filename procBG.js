@@ -282,16 +282,12 @@ function ProceduralBackground(user_settings){
           grid_object = {
             height: height,
             width : width,
-            state : new Array(size),
-            r     : new Uint8ClampedArray(size),
-            g     : new Uint8ClampedArray(size),
-            b     : new Uint8ClampedArray(size),
-            a     : new Int8Array(size)
+            state : new Array(size).fill(0),
+            r     : new Array(size).fill(0),
+            g     : new Array(size).fill(0),
+            b     : new Array(size).fill(0),
+            a     : new Array(size).fill(0)
           };
-
-      for (var i = 0; i < size; i++) {
-        grid_object.state[i] = 0;
-      };
 
       return grid_object;
     },
