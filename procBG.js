@@ -3,16 +3,21 @@ function ProceduralBackground(user_settings){
 
   var Main = {
     _settings: {
-      cell_width       : 5,
-      cell_height      : 5,
+      cell_width       : 1,
+      cell_height      : 1,
       cell_gap         : 0,
-      variance         : 10,
+      variance         : 5,
       variance_fulcrum : 0.5,
-      fill_percentage  : 50,
+      fill_percentage  : 100,
       base_alpha       : 100,
       algo             : "branch", //"branch"/"diffuse"
       render_method    : "square",
       parent           : document.body,
+      seed: {b: 56,
+              g: 179,
+              r: 218,
+              x: 370,
+              y: 200},
 
       canvas_styling : {
         "position" : "fixed",
@@ -160,6 +165,7 @@ function ProceduralBackground(user_settings){
       store_object.var_store[3] = null; // modulo
       store_object.var_store[4] = null; // no longer bounding index
       store_object.var_store[5] = null; // i
+      var test = [];
 
       store_object.var_store[6] = [
         this.getCellIndex(store_object.next_generated_cell_xy.x + 1, store_object.next_generated_cell_xy.y,     grid_object.width, grid_object.height),
@@ -198,11 +204,56 @@ function ProceduralBackground(user_settings){
 
         store_object.var_store[4] = store_object.bounding_cell_indices.indexOf(store_object.var_store[0]);
         if (store_object.var_store[4] >= 0){
-          this.spliceOne(store_object.bounding_cell_indices, store_object.var_store[4])
+          test[test.length++] = store_object.var_store[4];
+          //this.spliceOne(store_object.bounding_cell_indices, store_object.var_store[4])
         }
       };
 
+      this.spliceMultiple(store_object.bounding_cell_indices, test);
+
       return store_object.bounding_cell_indices;
+    },
+
+
+    spliceMultiple: function spliceMultiple(arr, indexes_to_remove){
+      if (!arr.length || !indexes_to_remove.length)
+        return;
+
+      if (indexes_to_remove.length > 1){
+        indexes_to_remove.sort(function(a, b) {
+          return b - a;
+        });
+      }
+      //detect if arrat longer than 1
+      // start at inital point
+      // on each iteration, detect if current point is beginning of continuous block
+      // if so, shift pointer to last element in block
+
+      var curr_index = indexes_to_remove[indexes_to_remove.length - 1],
+          init_length = indexes_to_remove.length,
+          global_offset = 0,
+          last_index;
+
+      for (curr_index; curr_index < arr.length; curr_index++) {
+          if (indexes_to_remove.length > 0 && curr_index + global_offset === indexes_to_remove[indexes_to_remove.length - 1]){
+            last_index = indexes_to_remove.length - 1;
+            for (var i = last_index; i >= 0; i--) {
+              if (indexes_to_remove[i] - indexes_to_remove[last_index] <= 1){
+                last_index = i;
+              } else {
+                i = 0;
+              }
+            };
+
+            global_offset = indexes_to_remove[last_index] - curr_index + 1;
+            arr[curr_index] = arr[indexes_to_remove[last_index] + 1];
+            indexes_to_remove.length = last_index; //cutting off extra indices
+          } else {
+            arr[curr_index] = arr[curr_index + global_offset];
+          }
+      };
+
+      arr.length = arr.length - init_length;
     },
 
 
