@@ -108,7 +108,7 @@ function ProceduralBackground(user_settings){
       return grid_object;
     },
 
-
+    /* Get x,y coordinates of cell based on its index in grid buffer and grid params */
     getCellXY: function getCellXY(grid_object, index){
       var modulo = index % grid_object.width;
       return {
@@ -117,7 +117,7 @@ function ProceduralBackground(user_settings){
       }
     },
 
-
+    /* Get index of cell in the grid buffer based on x,y position and grid parameters*/
     getCellIndex: function getCellIndex(x, y, grid_width, grid_height){
       if ((x < 0 || x >= grid_width) || (y < 0 || y >= grid_height))
         return Infinity;
@@ -223,7 +223,7 @@ function ProceduralBackground(user_settings){
       return store_object.bounding_cell_indices;
     },
 
-
+    /* Splice indexes in indexes_to_remove from array arr in a single sweep */
     spliceMultiple: function spliceMultiple(arr, indexes_to_remove){
       if (!arr.length || !indexes_to_remove.length)
         return arr;
@@ -261,20 +261,6 @@ function ProceduralBackground(user_settings){
       arr.length = arr.length - init_length;
       return arr;
     },
-
-
-    spliceOne: function(arr, index) {
-      if (!arr.length) { 
-        return
-      }
-
-      for (index; index < arr.length; index++) { 
-        arr[index] = arr[index+1];
-      }
-
-      arr.length--;
-     },
-
 
     /* get average colour with slight variance shift for all listed colours */
     getAvgColour: function getAvgColour(base_cell_index, adjacent_cell_indices, grid_object, settings){
@@ -413,7 +399,6 @@ function ProceduralBackground(user_settings){
         };   
 
         MAIN_GRID_OBJECT = this.createCell(MAIN_GRID_OBJECT, _STORE.next_generated_cell_xy.x, _STORE.next_generated_cell_xy.y, _STORE.next_generated_cell_colour.r, _STORE.next_generated_cell_colour.g, _STORE.next_generated_cell_colour.b, settings);
-        //_STORE.bounding_cell_indices[_STORE.bounding_cell_indices.length++] = _STORE.next_generated_cell_index;
 
         generation_cycles++;
       }
