@@ -157,17 +157,16 @@ function ProceduralBackground(user_settings){
     },
 
     /* Algorithm to find list of all cells that are at the bounds of the currently generated shape */
-    getListOfBoundingCells: function getListOfBoundingCells(grid_object, store_object){
+    updateListOfBoundingCells: function updateListOfBoundingCells(grid_object, store_object){
 
-      store_object.var_store[0] = null; // current index
-      store_object.var_store[1] = null; // cell x
-      store_object.var_store[2] = null; // cell y
-      store_object.var_store[3] = null; // modulo
-      store_object.var_store[4] = null; // no longer bounding index
-      store_object.var_store[5] = null; // i
-      var test = [];
+      var current_index = null, // current index
+          cell_x = null, // cell x
+          cell_y = null, // cell y
+          modulo = null, // modulo
+          index_being_checked = null, // for-loop i
+          check_failing_indeces = [];
 
-      store_object.var_store[6] = [
+      store_object.indexes_to_check = [
         this.getCellIndex(store_object.next_generated_cell_xy.x + 1, store_object.next_generated_cell_xy.y,     grid_object.width, grid_object.height),
         this.getCellIndex(store_object.next_generated_cell_xy.x,     store_object.next_generated_cell_xy.y + 1, grid_object.width, grid_object.height),
         this.getCellIndex(store_object.next_generated_cell_xy.x - 1, store_object.next_generated_cell_xy.y,     grid_object.width, grid_object.height),
@@ -175,41 +174,51 @@ function ProceduralBackground(user_settings){
         store_object.next_generated_cell_index
       ];
 
-      for (store_object.var_store[5] = 0; store_object.var_store[5] < store_object.var_store[6].length; store_object.var_store[5]++) {
-        store_object.var_store[0] = store_object.var_store[6][store_object.var_store[5]];
+      store_object.bounding_cell_indices[store_object.bounding_cell_indices.length++] = store_object.next_generated_cell_index;
 
-        if (grid_object.state[store_object.var_store[0]] !== 1){
+      for (index_being_checked = 0; index_being_checked < store_object.indexes_to_check.length; index_being_checked++) {
+        current_index = store_object.indexes_to_check[index_being_checked];
+
+        if (grid_object.state[current_index] !== 1){
           continue;
         }
 
-        store_object.var_store[3] = store_object.var_store[0] % grid_object.width;
-        store_object.var_store[1] = store_object.var_store[0] < grid_object.width ? store_object.var_store[0] : store_object.var_store[3];
-        store_object.var_store[2] = store_object.var_store[0] < grid_object.width ? 0 : (store_object.var_store[0] - store_object.var_store[3]) / grid_object.width;
+        modulo = current_index % grid_object.width;
+        cell_x = current_index < grid_object.width ? current_index : modulo;
+        cell_y = current_index < grid_object.width ? 0 : (current_index - modulo) / grid_object.width;
 
-        if (store_object.var_store[1] - 1 >= 0 && grid_object.state[store_object.var_store[2] * grid_object.width + store_object.var_store[1] - 1] === 0){ // previous x index
+        if (index_being_checked === store_object.next_generated_cell_index && check_failing_indeces.length){
+          // If our current target is the newly added cell index, and we've only had one no longer bounding cell so far,
+          // we can simply substitute it in the bounding cell index list with the newly added cell index
+
+          store_object.bounding_cell_indices[check_failing_indeces[--check_failing_indeces.length]] = store_object.next_generated_cell_index;
+          store_object.bounding_cell_indices.length--;
+        }
+
+        if (cell_x - 1 >= 0 && grid_object.state[cell_y * grid_object.width + cell_x - 1] === 0){ // previous x index
           continue;
         }
 
-        if (store_object.var_store[1] + 1 < grid_object.width && grid_object.state[store_object.var_store[2] * grid_object.width + store_object.var_store[1] + 1] === 0){ // next x index
+        if (cell_x + 1 < grid_object.width && grid_object.state[cell_y * grid_object.width + cell_x + 1] === 0){ // next x index
           continue;
         }
 
-        if (grid_object.state[(store_object.var_store[2] - 1) * grid_object.width + store_object.var_store[1]] === 0){ // previous y index
+        if (grid_object.state[(cell_y - 1) * grid_object.width + cell_x] === 0){ // previous y index
           continue;
         }
 
-        if (grid_object.state[(store_object.var_store[2] + 1) * grid_object.width + store_object.var_store[1]] === 0){ // next y index
+        if (grid_object.state[(cell_y + 1) * grid_object.width + cell_x] === 0){ // next y index
           continue;
         }
 
-        store_object.var_store[4] = store_object.bounding_cell_indices.indexOf(store_object.var_store[0]);
-        if (store_object.var_store[4] >= 0){
-          test[test.length++] = store_object.var_store[4];
-          //this.spliceOne(store_object.bounding_cell_indices, store_object.var_store[4])
-        }
+        for (var i = 0; i < store_object.bounding_cell_indices.length; i++) {
+          if (store_object.bounding_cell_indices[i] === current_index){
+            check_failing_indeces[check_failing_indeces.length++] = i;
+          }
+        };
       };
 
-      this.spliceMultiple(store_object.bounding_cell_indices, test);
+      store_object.bounding_cell_indices = this.spliceMultiple(store_object.bounding_cell_indices, check_failing_indeces);
 
       return store_object.bounding_cell_indices;
     },
@@ -217,17 +226,13 @@ function ProceduralBackground(user_settings){
 
     spliceMultiple: function spliceMultiple(arr, indexes_to_remove){
       if (!arr.length || !indexes_to_remove.length)
-        return;
+        return arr;
 
       if (indexes_to_remove.length > 1){
         indexes_to_remove.sort(function(a, b) {
           return b - a;
         });
       }
-      //detect if arrat longer than 1
-      // start at inital point
-      // on each iteration, detect if current point is beginning of continuous block
-      // if so, shift pointer to last element in block
 
       var curr_index = indexes_to_remove[indexes_to_remove.length - 1],
           init_length = indexes_to_remove.length,
@@ -254,6 +259,7 @@ function ProceduralBackground(user_settings){
       };
 
       arr.length = arr.length - init_length;
+      return arr;
     },
 
 
@@ -348,23 +354,22 @@ function ProceduralBackground(user_settings){
             base_cell_index             : Infinity,
             base_cell_xy                : {},
             empty_adjacent_cell_indices : [],
-            var_store                   : new Array(7)
+            indexes_to_check            : new Array(5)
           },
 
           MAIN_GRID_OBJECT = this.generateSkeletonGrid(settings.grid_height, settings.grid_width);
 
-
       var seed = settings.seed || this.getSeed(settings.grid_height, settings.grid_width);
       MAIN_GRID_OBJECT = this.createCell(MAIN_GRID_OBJECT, seed.x, seed.y, seed.r, seed.g, seed.b, settings);
-      _STORE.bounding_cell_indices[0] = this.getCellIndex(seed.x, seed.y, settings.grid_width, settings.grid_height);
       _STORE.next_generated_cell_index = this.getCellIndex(seed.x, seed.y, settings.grid_width, settings.grid_height); // BAD
+
       _STORE.next_generated_cell_xy = {x: seed.x, y: seed.y};
 
       console.log(settings);
       console.log("Generation cycles: " + generation_cycles_MAX);
       while (generation_cycles < generation_cycles_MAX){
         // Find list of all cells forming the outline of the ccurrent shape
-        _STORE.bounding_cell_indices =  this.getListOfBoundingCells(MAIN_GRID_OBJECT, _STORE);
+        _STORE.bounding_cell_indices =  this.updateListOfBoundingCells(MAIN_GRID_OBJECT, _STORE);
         _STORE.empty_cell_not_found = true;
         _STORE.empty_cell_search_cycles = 0;
         _STORE.next_generated_cell_colour = {r: 0, g: 0 , b: 0, a: 100};
@@ -408,19 +413,7 @@ function ProceduralBackground(user_settings){
         };   
 
         MAIN_GRID_OBJECT = this.createCell(MAIN_GRID_OBJECT, _STORE.next_generated_cell_xy.x, _STORE.next_generated_cell_xy.y, _STORE.next_generated_cell_colour.r, _STORE.next_generated_cell_colour.g, _STORE.next_generated_cell_colour.b, settings);
-        _STORE.bounding_cell_indices[_STORE.bounding_cell_indices.length++] = this.getCellIndex(_STORE.next_generated_cell_xy.x, _STORE.next_generated_cell_xy.y, settings.grid_width, settings.grid_height);
-
-       // MAIN_GRID_OBJECT.bounding_cell_indices = _STORE.bounding_cell_indices;
-
-        // _STORE.copy = JSON.parse(JSON.stringify(MAIN_GRID_OBJECT));
-        // render_queue.push(_STORE.copy);
-
-        // // for (var i = 0; i < _STORE.bounding_cell_indices.length; i++) {
-        // //   _STORE.bounding_cell_indices[i].bounding = false;
-        // // };
-        // for (var i = 0; i < _STORE.adjacent_cell_indices.length; i++) {
-        //   _STORE.adjacent_cell_indices[i].adjacent = false;
-        // };
+        //_STORE.bounding_cell_indices[_STORE.bounding_cell_indices.length++] = _STORE.next_generated_cell_index;
 
         generation_cycles++;
       }
@@ -428,21 +421,6 @@ function ProceduralBackground(user_settings){
       console.log("Generation elapsed time: " + (new Date().getTime() - startTime) + "ms");
 
       return MAIN_GRID_OBJECT;
-
-      // var frame = 0;
-
-      // var renderFrame = function renderFrame(){
-      //     // do some stuff
-      //     if (frame === render_queue.length)
-      //       return;
-
-      //        //console.log("rendering frame " + frame);
-      //   render(render_queue[frame], context, settings);
-      //   frame = frame + 1;
-      //     setTimeout(renderFrame, 16);
-      // };
-
-      // renderFrame();
     }
   };
 
