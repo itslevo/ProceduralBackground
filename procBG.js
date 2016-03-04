@@ -1,24 +1,21 @@
+(function(window){
+
 function ProceduralBackground(user_settings){
   "use strict";
 
   var Main = {
     _settings: {
-      cell_width       : 1,
-      cell_height      : 1,
+      cell_width       : 20,
+      cell_height      : 20,
       cell_gap         : 0,
-      variance         : 5,
+      variance         : 3,
       variance_fulcrum : 0.5,
       fill_percentage  : 100,
       base_alpha       : 100,
       algo             : "branch", //"branch"/"diffuse"
       render_method    : "square",
       parent           : document.body,
-      seed: {b: 56,
-              g: 179,
-              r: 218,
-              x: 370,
-              y: 200},
-
+      seed             : false,
       canvas_styling : {
         "position" : "fixed",
         "top"      : 0,
@@ -50,9 +47,6 @@ function ProceduralBackground(user_settings){
           styles = settings.canvas_styling,
           parent = settings.parent;
 
-      canvas.height = window.innerHeight;
-      canvas.width = window.innerWidth;
-
       for (var setting in styles) {
         canvas.style[setting] = styles[setting];
       }
@@ -62,6 +56,9 @@ function ProceduralBackground(user_settings){
       } else {
         throw "Error: incorrect parent element specified for canvas to be appended to";
       }
+
+      canvas.height = parent.offsetHeight;
+      canvas.width = parent.offsetWidth;
 
       settings.canvas = canvas;
 
@@ -103,7 +100,6 @@ function ProceduralBackground(user_settings){
       grid_object.r[index] = r || 0;
       grid_object.g[index] = g || 0;
       grid_object.b[index] = b || 0;
-      grid_object.a[index] = settings.base_alpha || 100;
 
       return grid_object;
     },
@@ -183,9 +179,9 @@ function ProceduralBackground(user_settings){
           continue;
         }
 
-        modulo = current_index % grid_object.width;
-        cell_x = current_index < grid_object.width ? current_index : modulo;
-        cell_y = current_index < grid_object.width ? 0 : (current_index - modulo) / grid_object.width;
+        modulo = (current_index % grid_object.width);
+        cell_x = (current_index < grid_object.width ? current_index : modulo);
+        cell_y = (current_index < grid_object.width ? 0 : (current_index - modulo) / grid_object.width);
 
         if (index_being_checked === store_object.next_generated_cell_index && check_failing_indeces.length){
           // If our current target is the newly added cell index, and we've only had one no longer bounding cell so far,
@@ -317,11 +313,78 @@ function ProceduralBackground(user_settings){
             state : new Uint8Array(size),
             r     : new Uint8Array(size),
             g     : new Uint8Array(size),
-            b     : new Uint8Array(size),
-            a     : new Uint8Array(size)
+            b     : new Uint8Array(size)
           };
 
       return grid_object;
+    },
+
+    generateStoreObject: function generateStoreObject(){
+      this.store_object = {
+        bounding_cell_indices       : [],
+        empty_cell_not_found        : true,
+        empty_cell_search_cycles    : 0,
+        next_generated_cell_colour  : {},
+        next_generated_cell_index   : Infinity,
+        next_generated_cell_xy      : {},
+        base_cell_index             : Infinity,
+        base_cell_xy                : {},
+        empty_adjacent_cell_indices : [],
+        indexes_to_check            : new Array(5)
+      };
+
+      return this.store_object;
+    },
+
+    singleIteration: function singleIteration(store_object, grid_object, settings, cycles, max_cycles){
+        // Find list of all cells forming the outline of the ccurrent shape
+        store_object.bounding_cell_indices =  this.updateListOfBoundingCells(grid_object, store_object);
+        store_object.empty_cell_not_found = true;
+        store_object.empty_cell_search_cycles = 0;
+        store_object.next_generated_cell_colour = {r: 0, g: 0 , b: 0};
+
+        if (store_object.bounding_cell_indices.length === 0){
+          // If no more bounding cells left (i.e. we've reached the edges of the screen), terminate loop
+          store_object.empty_cell_not_found = false;
+          cycles = max_cycles;
+          return cycles;
+        }
+   
+        while (store_object.empty_cell_not_found && store_object.empty_cell_search_cycles < 100) {
+          // Find random cell from overall list of bounding cells. This will be a jumping off point for the creation of our next cell
+          store_object.base_cell_index = store_object.bounding_cell_indices[Math.floor(Math.random() * store_object.bounding_cell_indices.length)],
+          store_object.base_cell_xy = this.getCellXY(grid_object, store_object.base_cell_index);
+
+          // Find all empty cells that are in a 3x3 grid around our base cell
+          store_object.empty_adjacent_cell_indices = this.getListOfAdjacentIndices(grid_object, store_object.base_cell_xy.x, store_object.base_cell_xy.y, false);    
+
+          if (store_object.empty_adjacent_cell_indices.length > 0){
+            // If there is at least one empty cell adjacent to our base cell, select one from the list
+            store_object.next_generated_cell_index = store_object.empty_adjacent_cell_indices[Math.floor(Math.random() * store_object.empty_adjacent_cell_indices.length)];
+            store_object.next_generated_cell_xy = this.getCellXY(grid_object, store_object.next_generated_cell_index);
+
+            if (settings.algo === "branch"){
+              // Next colour is generated based on a single coloured cell -- the base cell
+              store_object.next_generated_cell_colour = this.getAvgColour(store_object.base_cell_index, [], grid_object, settings);
+            } else if (settings.algo === "diffuse") {
+              // New colour is generated based on an averaged colour of list of other adjacent non-empty cells
+              store_object.next_generated_cell_colour = this.getAvgColour(store_object.base_cell_index, this.getListOfAdjacentIndices(grid_object, store_object.base_cell_xy.x, store_object.base_cell_xy.y, true), grid_object, settings);
+            }
+            
+            store_object.empty_cell_not_found = false;
+          }
+    
+          store_object.empty_cell_search_cycles++; 
+          if (store_object.empty_cell_search_cycles === 100){
+            // Failsafe: if we're hitting too many search cycles that don't return a viable random base cell, exit
+            cycles = max_cycles;
+            return cycles;
+          }
+        };
+
+        grid_object = this.createCell(grid_object, store_object.next_generated_cell_xy.x, store_object.next_generated_cell_xy.y, store_object.next_generated_cell_colour.r, store_object.next_generated_cell_colour.g, store_object.next_generated_cell_colour.b, settings);
+
+        return ++cycles;
     },
 
     generateMainBackgroundGrid: function generateMainBackgroundGrid(settings){
@@ -329,20 +392,7 @@ function ProceduralBackground(user_settings){
 
       var generation_cycles = 0,
           generation_cycles_MAX = Math.floor(settings.grid_height * settings.grid_width / 100 * settings.fill_percentage) - 1,
-
-          _STORE = {
-            bounding_cell_indices       : [],
-            empty_cell_not_found        : true,
-            empty_cell_search_cycles    : 0,
-            next_generated_cell_colour  : {},
-            next_generated_cell_index   : Infinity,
-            next_generated_cell_xy      : {},
-            base_cell_index             : Infinity,
-            base_cell_xy                : {},
-            empty_adjacent_cell_indices : [],
-            indexes_to_check            : new Array(5)
-          },
-
+          _STORE = this.generateStoreObject(),
           MAIN_GRID_OBJECT = this.generateSkeletonGrid(settings.grid_height, settings.grid_width);
 
       var seed = settings.seed || this.getSeed(settings.grid_height, settings.grid_width);
@@ -353,54 +403,9 @@ function ProceduralBackground(user_settings){
 
       console.log(settings);
       console.log("Generation cycles: " + generation_cycles_MAX);
+
       while (generation_cycles < generation_cycles_MAX){
-        // Find list of all cells forming the outline of the ccurrent shape
-        _STORE.bounding_cell_indices =  this.updateListOfBoundingCells(MAIN_GRID_OBJECT, _STORE);
-        _STORE.empty_cell_not_found = true;
-        _STORE.empty_cell_search_cycles = 0;
-        _STORE.next_generated_cell_colour = {r: 0, g: 0 , b: 0, a: 100};
-
-        if (_STORE.bounding_cell_indices.length === 0){
-          // If no more bounding cells left (i.e. we've reached the edges of the screen), terminate loop
-          _STORE.empty_cell_not_found = false;
-          generation_cycles = generation_cycles_MAX;
-          continue;
-        }
-   
-        while (_STORE.empty_cell_not_found && _STORE.empty_cell_search_cycles < 100) {
-          // Find random cell from overall list of bounding cells. This will be a jumping off point for the creation of our next cell
-          _STORE.base_cell_index = _STORE.bounding_cell_indices[Math.floor(Math.random() * _STORE.bounding_cell_indices.length)],
-          _STORE.base_cell_xy = this.getCellXY(MAIN_GRID_OBJECT, _STORE.base_cell_index);
-
-          // Find all empty cells that are in a 3x3 grid around our base cell
-          _STORE.empty_adjacent_cell_indices = this.getListOfAdjacentIndices(MAIN_GRID_OBJECT, _STORE.base_cell_xy.x, _STORE.base_cell_xy.y, false);    
-
-          if (_STORE.empty_adjacent_cell_indices.length > 0){
-            // If there is at least one empty cell adjacent to our base cell, select one from the list
-            _STORE.next_generated_cell_index = _STORE.empty_adjacent_cell_indices[Math.floor(Math.random() * _STORE.empty_adjacent_cell_indices.length)];
-            _STORE.next_generated_cell_xy = this.getCellXY(MAIN_GRID_OBJECT, _STORE.next_generated_cell_index);
-
-            if (settings.algo === "branch"){
-              // Next colour is generated based on a single coloured cell -- the base cell
-              _STORE.next_generated_cell_colour = this.getAvgColour(_STORE.base_cell_index, [], MAIN_GRID_OBJECT, settings);
-            } else if (settings.algo === "diffuse") {
-              // New colour is generated based on an averaged colour of list of other adjacent non-empty cells
-              _STORE.next_generated_cell_colour = this.getAvgColour(_STORE.base_cell_index, this.getListOfAdjacentIndices(MAIN_GRID_OBJECT, _STORE.base_cell_xy.x, _STORE.base_cell_xy.y, true), MAIN_GRID_OBJECT, settings);
-            }
-            
-            _STORE.empty_cell_not_found = false;
-          }
-    
-          _STORE.empty_cell_search_cycles++; 
-          if (_STORE.empty_cell_search_cycles === 100){
-            // Failsafe: if we're hitting too many search cycles that don't return a viable random base cell, exit
-            generation_cycles = generation_cycles_MAX;
-          }
-        };   
-
-        MAIN_GRID_OBJECT = this.createCell(MAIN_GRID_OBJECT, _STORE.next_generated_cell_xy.x, _STORE.next_generated_cell_xy.y, _STORE.next_generated_cell_colour.r, _STORE.next_generated_cell_colour.g, _STORE.next_generated_cell_colour.b, settings);
-
-        generation_cycles++;
+        generation_cycles = this.singleIteration(_STORE, MAIN_GRID_OBJECT, settings, generation_cycles, generation_cycles_MAX);
       }
 
       console.log("Generation elapsed time: " + (new Date().getTime() - startTime) + "ms");
@@ -499,7 +504,7 @@ function ProceduralBackground(user_settings){
           }
           
           if (grid_object.state[i] === 1) {
-            ctx.fillStyle = "rgba("+ grid_object.r[i] +","+ grid_object.g[i] +","+ grid_object.b[i] +","+ grid_object.a[i] +")";
+            ctx.fillStyle = "rgba("+ grid_object.r[i] +","+ grid_object.g[i] +","+ grid_object.b[i] +","+ settings.base_alpha  +")";
             render_method(x_pointer * (cell_width + gap), y_pointer * (cell_height + gap), cell_width, cell_height, ctx);
           } else {
             ctx.fillStyle = default_colour;
@@ -521,16 +526,65 @@ function ProceduralBackground(user_settings){
     },
 
     render: function(){
-      var gridObj = Generator.generateMainBackgroundGrid(Main._settings);
-      Renderer.render(gridObj, Main._settings);
+      this.gridObj = Generator.generateMainBackgroundGrid(Main._settings);
+      Renderer.render(this.gridObj, Main._settings);
+    },
+
+    renderAnimated: function(){
+      var startTime = new Date().getTime();
+
+      var settings = Main._settings,
+          generation_cycles = 0,
+          generation_cycles_MAX = Math.floor(settings.grid_height * settings.grid_width / 100 * settings.fill_percentage) - 1,
+          _STORE = Generator.generateStoreObject(),
+          MAIN_GRID_OBJECT = Generator.generateSkeletonGrid(settings.grid_height, settings.grid_width),
+          seed = settings.seed || Generator.getSeed(settings.grid_height, settings.grid_width),
+          ctx = settings.canvas.getContext("2d"),
+          gen_per_second = Math.floor(generation_cycles_MAX * 0.001);
+
+
+      MAIN_GRID_OBJECT = Generator.createCell(MAIN_GRID_OBJECT, seed.x, seed.y, seed.r, seed.g, seed.b, settings);
+      _STORE.next_generated_cell_index = Generator.getCellIndex(seed.x, seed.y, settings.grid_width, settings.grid_height); // BAD
+
+      _STORE.next_generated_cell_xy = {x: seed.x, y: seed.y};
+
+      console.log(settings);
+      console.log("Cells to generate: " + generation_cycles_MAX);
+      console.log("Cells per second: " + gen_per_second);
+
+      ctx.fillStyle = "rgb("+ seed.r +","+ seed.g +","+  seed.b + ")";
+      Renderer.renderCell(
+        _STORE.next_generated_cell_xy.x * (settings.cell_width + settings.cell_gap),
+        _STORE.next_generated_cell_xy.y * (settings.cell_height + settings.cell_gap),
+        settings.cell_width,
+        settings.cell_height,
+        ctx
+      ); 
+
+      function renderFrame(){
+        //ctx.clearRect(0,0, MAIN_GRID_OBJECT.width * (settings.cell_width + settings.cell_gap), MAIN_GRID_OBJECT.height * (settings.cell_height + settings.cell_gap));
+        for (var i = 0; i < gen_per_second; i++) {
+          generation_cycles = Generator.singleIteration(_STORE, MAIN_GRID_OBJECT, settings, generation_cycles, generation_cycles_MAX);
+          ctx.fillStyle = "rgb("+ _STORE.next_generated_cell_colour.r +","+ _STORE.next_generated_cell_colour.g +","+  _STORE.next_generated_cell_colour.b + ")";
+          Renderer.renderCell(
+            _STORE.next_generated_cell_xy.x * (settings.cell_width + settings.cell_gap),
+            _STORE.next_generated_cell_xy.y * (settings.cell_height + settings.cell_gap),
+            settings.cell_width,
+            settings.cell_height,
+            ctx
+          ); 
+        };
+
+        if (generation_cycles < generation_cycles_MAX){
+          requestAnimationFrame(renderFrame);
+        }
+      }
+
+      requestAnimationFrame(renderFrame);
     },
 
     importSettings: function(settings){
       return JSON.parse(JSON.stringify(Main.importSettings(settings)));
-    },
-
-    renderFrames: function(){
-
     },
 
     destroy: function(){
@@ -538,3 +592,9 @@ function ProceduralBackground(user_settings){
     }
   }
 }
+
+window.ProceduralBackground = ProceduralBackground();
+
+}(window));
+
+

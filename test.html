@@ -6,6 +6,15 @@
 			position: relative;
 			z-index: 1;
 		}
+
+    #content{
+      position: absolute;
+      top: 20%;
+      bottom: 20%;
+      right: 10%;
+      left: 10%;
+      margin: auto;
+    }
 	</style>
 </head>
 <body>
@@ -15,10 +24,40 @@
 	<button id="render">render</button>
 <script src="procBG.js"></script>
 <script type="text/javascript">
-	var test = ProceduralBackground({});
-	test.init();
+	ProceduralBackground.init({
+	    cell_width       : 5,
+      cell_height      : 5,
+      cell_gap         : 0,
+      variance         : 2,
+      variance_fulcrum : 0.5,
+      fill_percentage  : 100,
+      base_alpha       : 100,
+      algo             : "branch", //"branch"/"diffuse"
+      render_method    : "square",
+      parent           : document.getElementById("content"),
+      // seed: {b: 56,
+      //         g: 179,
+      //         r: 218,
+      //         x: 370,
+      //         y: 200},
+
+      canvas_styling : {
+        "position" : "absolute",
+        "top"      : 0,
+        "bottom"   : 0,
+        "right"    : 0,
+        "left"     : 0,
+        "width"    : "99.5%",
+        "height"   : "99.5%",
+        "border-width"   : "1px",
+        "border-style"   : "solid",
+        "border-color"   : "yellow red yellow red"
+      },
+      background_grid: false
+  	});
+
 	document.getElementById("render").addEventListener("click", function( ) {
-		test.render();
+		ProceduralBackground.render();
 	}, false);
 </script>
 </body>
