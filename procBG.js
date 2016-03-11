@@ -539,31 +539,45 @@ function ProceduralBackground(user_settings){
           _STORE = Generator.generateStoreObject(),
           MAIN_GRID_OBJECT = Generator.generateSkeletonGrid(settings.grid_height, settings.grid_width),
           seed = settings.seed || Generator.getSeed(settings.grid_height, settings.grid_width),
+          seed_array = settings.seed_array,
           ctx = settings.canvas.getContext("2d"),
-          gen_per_second = Math.floor(generation_cycles_MAX * 0.001);
+          smallest_side = settings.grid_height > settings.grid_width ? settings.grid_width : settings.grid_height,
+          bounding_cell_indices_MAX = Math.floor(2 * Math.PI * smallest_side / 2 * 1.5),
+          speed_factor = settings.speed_factor || 1,
+          speed = 0.001 * speed_factor,
+          // calculated based on maximum possible circle circumference within square defined by grid size * "fuzziness factor"
+          // Note: this assumes we're growing just one blob
+          gen_per_frame_base = Math.floor(generation_cycles_MAX * speed),
+          gen_per_frame_MAX = gen_per_frame_base,
+          gen_per_frame_dynamic = gen_per_frame_base;
 
+      if (seed_array.length === 0){
+        seed_array.push(seed);
+      }
 
-      MAIN_GRID_OBJECT = Generator.createCell(MAIN_GRID_OBJECT, seed.x, seed.y, seed.r, seed.g, seed.b, settings);
-      _STORE.next_generated_cell_index = Generator.getCellIndex(seed.x, seed.y, settings.grid_width, settings.grid_height); // BAD
-
-      _STORE.next_generated_cell_xy = {x: seed.x, y: seed.y};
+      // Seeding loop
+      for (var i = 0; i < seed_array.length; i++) {
+        var seed_i = seed_array[i];
+        Generator.createCell(MAIN_GRID_OBJECT, seed_i.x, seed_i.y, seed_i.r, seed_i.g, seed_i.b, settings);
+        _STORE.bounding_cell_indices[_STORE.bounding_cell_indices.length++] =  Generator.getCellIndex(seed_i.x, seed_i.y, settings.grid_width, settings.grid_height);
+        _STORE.next_generated_cell_xy = {x: seed_i.x, y: seed_i.y};
+        ctx.fillStyle = "rgb("+ seed_i.r +","+ seed_i.g +","+  seed_i.b + ")";
+        Renderer.renderCell(
+          _STORE.next_generated_cell_xy.x * (settings.cell_width + settings.cell_gap),
+          _STORE.next_generated_cell_xy.y * (settings.cell_height + settings.cell_gap),
+          settings.cell_width,
+          settings.cell_height,
+          ctx
+        ); 
+      };
 
       console.log(settings);
       console.log("Cells to generate: " + generation_cycles_MAX);
-      console.log("Cells per second: " + gen_per_second);
+      console.log("Cells per frame: " + gen_per_frame_dynamic);
 
-      ctx.fillStyle = "rgb("+ seed.r +","+ seed.g +","+  seed.b + ")";
-      Renderer.renderCell(
-        _STORE.next_generated_cell_xy.x * (settings.cell_width + settings.cell_gap),
-        _STORE.next_generated_cell_xy.y * (settings.cell_height + settings.cell_gap),
-        settings.cell_width,
-        settings.cell_height,
-        ctx
-      ); 
+      function renderFrame(current_time){
 
-      function renderFrame(){
-        //ctx.clearRect(0,0, MAIN_GRID_OBJECT.width * (settings.cell_width + settings.cell_gap), MAIN_GRID_OBJECT.height * (settings.cell_height + settings.cell_gap));
-        for (var i = 0; i < gen_per_second; i++) {
+        for (var i = 0; i < gen_per_frame_dynamic; i++) {
           generation_cycles = Generator.singleIteration(_STORE, MAIN_GRID_OBJECT, settings, generation_cycles, generation_cycles_MAX);
           ctx.fillStyle = "rgb("+ _STORE.next_generated_cell_colour.r +","+ _STORE.next_generated_cell_colour.g +","+  _STORE.next_generated_cell_colour.b + ")";
           Renderer.renderCell(
@@ -572,8 +586,10 @@ function ProceduralBackground(user_settings){
             settings.cell_width,
             settings.cell_height,
             ctx
-          ); 
+          );
         };
+
+        gen_per_frame_dynamic = gen_per_frame_base * (_STORE.bounding_cell_indices.length / bounding_cell_indices_MAX);
 
         if (generation_cycles < generation_cycles_MAX){
           requestAnimationFrame(renderFrame);
