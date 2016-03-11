@@ -16,6 +16,8 @@ function ProceduralBackground(user_settings){
       render_method    : "square",
       parent           : document.body,
       seed             : false,
+      seed_array       : [],
+      speed_factor     : 1,
       canvas_styling : {
         "position" : "fixed",
         "top"      : 0,
