@@ -17,7 +17,7 @@ function ProceduralBackground(user_settings){
       parent           : document.body,
       seed             : false,
       seed_array       : [],
-      speed_factor     : 1,
+      speed_factor     : 2,
       canvas_styling : {
         "position" : "fixed",
         "top"      : 0,
@@ -40,7 +40,7 @@ function ProceduralBackground(user_settings){
         if (typeof external_settings[setting] !== "undefined")
           _settings[setting] = external_settings[setting];
       }
-
+      console.log('new settings are: ', _settings)
       return _settings;
     },
 
@@ -451,15 +451,15 @@ function ProceduralBackground(user_settings){
         var pos = Math.random();
 
         if (pos < 0.25)
-          renderTriangle(x, y, width, height, ctx);
+          this.renderTriangle(x, y, width, height, ctx);
         else if (pos < 0.5)
-          renderTriangle(x + width, y + height, -width, -height, ctx);
+          this.renderTriangle(x + width, y + height, -width, -height, ctx);
         else if (pos < 0.75)
-          renderTriangle(x, y + height, -width, height, ctx);
+          this.renderTriangle(x, y + height, -width, height, ctx);
         else if (pos < 1)
-          renderTriangle(x + width, y, width, -height, ctx);
+          this.renderTriangle(x + width, y, width, -height, ctx);
       } else {
-        renderCell(x, y, width, height, ctx);
+        this.renderCell(x, y, width, height, ctx);
       }
     },
 
@@ -489,7 +489,7 @@ function ProceduralBackground(user_settings){
             render_method = this.renderTriangle;
             break;
           case "triangle + square":
-            render_method = this.renderTriangleSquare;
+            render_method = this.renderTriangleSquare.bind(this);
             break;
           default:
             render_method = this.renderCell;
@@ -523,8 +523,11 @@ function ProceduralBackground(user_settings){
 
 
   return {
+    settings: {},
+
     init: function(settings){
       Main.bootstrap(Main.importSettings(settings));
+      this.settings = Main._settings
     },
 
     render: function(){
@@ -534,7 +537,6 @@ function ProceduralBackground(user_settings){
 
     renderAnimated: function(){
       var startTime = new Date().getTime();
-
       var settings = Main._settings,
           generation_cycles = 0,
           generation_cycles_MAX = Math.floor(settings.grid_height * settings.grid_width / 100 * settings.fill_percentage) - 1,
@@ -557,6 +559,7 @@ function ProceduralBackground(user_settings){
         seed_array.push(seed);
       }
 
+      console.log('actual main settings are:', settings)
       // Seeding loop
       for (var i = 0; i < seed_array.length; i++) {
         var seed_i = seed_array[i];

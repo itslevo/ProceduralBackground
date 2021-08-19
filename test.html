@@ -22,25 +22,30 @@
 
 	</div>
 	<button id="render">render</button>
+	<button id="renderAnimated">render animated</button>
+
+  <input type="number" value=5 id="pixelSize" style="width: 2rem" />
+  <select id="algo">
+    <option value="branch">bright colours</option>
+    <option value="diffuse">smeared colours</option>
+  </select>
 <script src="procBG.js"></script>
 <script type="text/javascript">
-	ProceduralBackground.init({
-	    cell_width       : 5,
-      cell_height      : 5,
+
+  function getSettings() {
+    var cell_value = parseInt(document.getElementById("pixelSize").value) || 5;
+    var algo = document.getElementById("algo").value || "branch";
+    return {
+	    cell_width       : cell_value,
+      cell_height      : cell_value,
       cell_gap         : 0,
       variance         : 2,
       variance_fulcrum : 0.5,
       fill_percentage  : 100,
       base_alpha       : 100,
-      algo             : "branch", //"branch"/"diffuse"
+      algo             : algo,
       render_method    : "square",
       parent           : document.getElementById("content"),
-      // seed: {b: 56,
-      //         g: 179,
-      //         r: 218,
-      //         x: 370,
-      //         y: 200},
-
       canvas_styling : {
         "position" : "absolute",
         "top"      : 0,
@@ -51,12 +56,49 @@
         "height"   : "99.5%",
         "border-width"   : "1px",
         "border-style"   : "solid",
-        "border-color"   : "yellow red yellow red"
+        "border-color"   : "white"
       },
       background_grid: false
-  	});
+  	}
+  }
+	ProceduralBackground.init(getSettings());
+
+  document.getElementById("renderAnimated").addEventListener("click", function () {
+    var settings = ProceduralBackground.settings
+    var grid_width = Math.floor(settings.canvas.width / (settings.cell_width + settings.cell_gap) + 1);
+    var grid_height = Math.floor(settings.canvas.height / (settings.cell_height + settings.cell_gap) + 1);
+
+
+    ProceduralBackground.init({
+      ...getSettings(),
+      seed: {
+        x: Math.floor(Math.random() * grid_width),
+        y: Math.floor(Math.random() * grid_height),
+        r: Math.floor(Math.random() * 256),
+        g: Math.floor(Math.random() * 256),
+        b: Math.floor(Math.random() * 256)
+      },
+      seed_array: []
+    })
+    ProceduralBackground.renderAnimated();
+  })
 
 	document.getElementById("render").addEventListener("click", function( ) {
+
+    var settings = ProceduralBackground.settings
+    var grid_width = Math.floor(settings.canvas.width / (settings.cell_width + settings.cell_gap) + 1);
+    var grid_height = Math.floor(settings.canvas.height / (settings.cell_height + settings.cell_gap) + 1);
+    ProceduralBackground.init({
+      ...getSettings(),
+      seed: {
+        x: Math.floor(Math.random() * grid_width),
+        y: Math.floor(Math.random() * grid_height),
+        r: Math.floor(Math.random() * 256),
+        g: Math.floor(Math.random() * 256),
+        b: Math.floor(Math.random() * 256)
+      },
+      seed_array: []
+    })
 		ProceduralBackground.render();
 	}, false);
 </script>
